@@ -1,0 +1,6 @@
+**/main.json
+**/.DS_Store
+changed_files.txt
+bicep_files_to_lint.txt
+deployment_group_files_to_lint.txt
+deployment_sub_files_to_lint

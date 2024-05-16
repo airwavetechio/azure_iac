@@ -1,0 +1,168 @@
+parameters:
+  serviceConnection: ""
+  environmentName: ""
+
+jobs:
+  - job: Deploy
+    steps:
+      - checkout: self
+        persistCredentials: true
+        clean: true
+      - task: Bash@3
+        displayName: "Identify Modified Bicep Files"
+        inputs:
+          targetType: "inline"
+          script: |
+            echo "Identifying modified Bicep files and writing results to bicep_files_to_lint.txt"
+
+            # Fetch all modified files in the last commit, we need to add the --depth param, and write it to a file.
+            git fetch --depth=10 origin +refs/heads/$(Build.SourceBranchName):refs/remotes/origin/$(Build.SourceBranchName)
+            git checkout $(Build.SourceBranchName)
+            commit1=$(git log --format=%H -n 1)
+            commit2=$(git log --format=%H -n 1 --skip=1)
+            echo "Commit 1 is ${commit1}"
+            echo "Commit 2 is ${commit2}"
+            git diff $commit2 $commit1 --name-only  > changed_files.txt
+
+            # Filter out which bicep directories need testing and store them in a file
+            grep '^projects/.*\.bicep$' changed_files.txt > deployment_sub_files_to_lint.txt
+            ### This doesn't fit the paradigm, manually provision for now. Probably for the best
+            ### since this is senstive stuff
+            #grep '^core_services/.*\.bicep$' changed_files.txt > deployment_sub_core_sevices_files_to_lint.txt
+            grep '^deployed_resources/.*\.bicep$' changed_files.txt > deployment_group_files_to_lint.txt
+
+
+            # Check if any bicep files need to be linted
+            check_files() {
+              local file="$1"
+              local context="$2"
+
+              if [ -s "$file" ]; then
+                  echo "Found modified Bicep files in $context:"
+                  cat "$file"
+              else
+                  echo "No az deployment $context Bicep files modified."
+              fi
+            }
+
+            # Check different deployment files
+            check_files "deployment_sub_files_to_lint.txt" "sub"
+            check_files "deployment_group_files_to_lint.txt" "group"
+
+      # - task: Bash@3
+      #   displayName: 'On Pull Request, create a list of all project related main.bicep Files'
+      #   condition: eq(variables['Build.Reason'], 'PullRequest')
+      #   inputs:
+      #     targetType: 'inline'
+      #     script: |
+      #       grep '^projects/.*\.bicep$' changed_files.txt > bicep_files_to_lint.txt
+
+      - task: Bash@3
+        displayName: "Lint Bicep Files"
+        inputs:
+          targetType: "inline"
+          script: |
+            # Function to perform linting
+            lint_files() {
+                local file_list="$1"
+
+                if [ -s "$file_list" ]; then
+                    echo "Starting linting based on $file_list"
+                    while IFS= read -r file; do
+                        echo "Linting $file"
+                        az bicep build --file "$file" || { echo "Linting failed for $file"; exit 1; }
+                    done < "$file_list"
+                    echo "Linting tests completed"
+                else
+                    echo "Skipping linting, no $1 Bicep files modified."
+                fi
+            }
+            # Perform linting for deployment sub files
+            lint_files "deployment_sub_files_to_lint.txt"
+            # Perform linting for deployment group files
+            lint_files "deployment_group_files_to_lint.txt"
+
+      - task: AzureCLI@2
+        displayName: "Bicep Dry Run (What-If)"
+        inputs:
+          azureSubscription: ${{ parameters.serviceConnection }}
+          scriptType: "bash"
+          scriptLocation: "inlineScript"
+          inlineScript: |
+            set -e  # Fail the script on any errors
+            # Function to perform dry run for given deployment types
+            perform_dry_run() {
+              local file_list="$1"
+              local deployment_type="$2"
+
+              if [ -s "$file_list" ]; then
+                while IFS= read -r file; do
+                  local dirPath=$(dirname "$file")
+                  local params_file="${dirPath}/parameters/${{parameters.environmentName}}.parameters.json"
+                
+                  # Prepare and perform the what-if command based on deployment type
+                  case "$deployment_type" in
+                    "sub")
+                      echo "Performing subscription-level dry run for $file with ${{parameters.environmentName}} parameters"
+                      az deployment sub what-if --location westus --template-file "${dirPath}/main.bicep" --parameters "$params_file" --parameter appName='dryrun' 
+                      ;;
+                    "group")
+                      local resource_group_name=$(echo "$dirPath" | cut -d '/' -f2)
+                      echo "Performing resource group-level dry run for $file with ${{parameters.environmentName}} parameters"
+                      az deployment group what-if --resource-group "$resource_group_name" --template-file "${dirPath}/main.bicep" --parameters "$params_file" --parameter appName='dryrun'
+                      ;;
+                  esac
+                done < "$file_list"
+              else
+               echo "Skipping Dry-Run, no $2 Bicep files to run for ${{parameters.environmentName}}"
+              fi
+            }
+
+            # Using the function for both deployment sub files and group files
+            perform_dry_run "deployment_sub_files_to_lint.txt" "sub"
+            perform_dry_run "deployment_group_files_to_lint.txt" "group"
+
+      - task: AzureCLI@2
+        displayName: "Deploy Bicep Files"
+        condition: succeeded() # Only run this task if all previous tasks have succeeded
+        inputs:
+          azureSubscription: ${{ parameters.serviceConnection }}
+          scriptType: "bash"
+          scriptLocation: "inlineScript"
+          inlineScript: |
+            set -e  # Fail the script on any errors
+            # Function to perform run for given deployment types
+            perform_run() {
+              local file_list="$1"
+              local deployment_type="$2"
+
+              if [ -s "$file_list" ]; then
+                while IFS= read -r file; do
+                  local dirPath=$(dirname "$file")
+                  local params_file="${dirPath}/parameters/${{parameters.environmentName}}.parameters.json"
+                
+                  # Prepare and perform the what-if command based on deployment type
+                  case "$deployment_type" in
+                    "sub")
+                        echo "Performing subscription-level deployment for $file with ${{parameters.environmentName}} parameters"
+                        az deployment sub create --location westus --template-file "${dirPath}/main.bicep" --parameters "$params_file" || {
+                          echo "Failed to deploy subscription-level operation. Please check the input parameters and configurations."
+                      }
+                        ;;
+                    "group")
+                        local resource_group_name=$(echo "$dirPath" | cut -d '/' -f2)
+                        echo "Performing resource group-level deployment for $file with ${{parameters.environmentName}} parameters"
+                        az deployment group create --resource-group "$resource_group_name" --template-file "${dirPath}/main.bicep" --parameters "$params_file" || {
+                          echo "Failed to deploy group-level operation. Please check the input parameters and configurations."
+                      }
+                        ;;
+                  esac
+                done < "$file_list"
+              else
+               echo "Skipping deployment, no $2 Bicep files to run for ${{parameters.environmentName}}"
+              fi
+            }
+
+            # Using the function for both deployment sub files and group files
+            perform_run "deployment_sub_files_to_lint.txt" "sub"
+            perform_run "deployment_group_files_to_lint.txt" "group"

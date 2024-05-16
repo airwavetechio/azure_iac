@@ -1,0 +1,41 @@
+trigger:
+  branches:
+    include:
+    - '*'
+pr:
+  - main
+  - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: Development
+    condition: or(contains(variables['Build.SourceBranch'], 'TICKET-001-name'), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    variables:
+    - template: dev.variables.yml
+    jobs:
+      - template: deployment-template.yml
+        parameters:
+          serviceConnection: ${{ variables.serviceConnection }}
+          environmentName: ${{ variables.environmentName }}
+
+  - stage: Staging
+    condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+    variables:
+    - template: staging.variables.yml
+    jobs:
+      - template: deployment-template.yml
+        parameters:
+          serviceConnection: ${{ variables.serviceConnection }}
+          environmentName: ${{ variables.environmentName }}
+
+  - stage: Production
+    condition: startsWith(variables['Build.SourceBranch'], 'refs/heads/release/')
+    variables:
+    - template: prod.variables.yml 
+    jobs:
+      - template: deployment-template.yml
+        parameters:
+          serviceConnection: ${{ variables.serviceConnection }}
+          environmentName: ${{ variables.environmentName }}

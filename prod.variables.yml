@@ -1,0 +1,3 @@
+variables:
+  environmentName: 'prod'
+  serviceConnection: '<some connection id from some secure source>'

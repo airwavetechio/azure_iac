@@ -1,0 +1,33 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "appName": {
+            "value": "vmss"
+        },
+        "tags": {
+            "value": {
+                "Owner": "tony@airwavetech.io",
+                "Created By": "tony@airwavetech.io",
+                "Tech Team": "Full Stacks",
+                "Application Name": "VMSS for Dev Environment",
+                "Environment": "Dev",
+                "Description": "A VM strictly used by Azure Pipelines",
+                "Stakeholder": "Cloud Ops",
+                "Created Using": "BICEP"
+            }
+        },
+        "env": {
+            "value": "dev"
+        },
+        "vmssVnetResourceGroupName": {
+            "value": "<resource group id>"
+        },
+        "vmssVnetName": {
+            "value": "<vnet name>"
+        },
+        "vmssSubnetName": {
+            "value": "sn_webapp_dev_wus"
+        }
+    }
+}

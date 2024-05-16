@@ -1,0 +1,39 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "value": {
+                "Owner": "tony@airwavetech.io",
+                "Created By": "tony@airwavetech.io",
+                "Tech Team": "Full Stacks",
+                "Application Name": "Project B",
+                "Environment": "Dev",
+                "Description": "A mgmt console",
+                "Stakeholder": "sheng",
+                "Created Using": "BICEP"
+            }
+        },
+        "env": {
+            "value": "dev"
+        },
+        "locationShorthand": {
+            "value": "wus"
+        },
+        "apiMgmtNSGName": {
+            "value": "nsg-apimgmt-dev-wus"
+        },
+        "vnetName": {
+            "value": "<vnet name>"
+        },
+        "vnetAppSvcId": {
+            "value": "/subscriptions/<dev subscription id>/resourceGroups/<resource group id>/providers/Microsoft.Network/virtualNetworks/<vnet name>"
+        },
+        "vnetAppSvcSubnetName": {
+            "value": "sn_webapp_dev_wus"
+        },
+        "vnetAppSvcSubnetId": {
+            "value": "/subscriptions/<dev subscription id>/resourceGroups/<resource group id>/providers/Microsoft.Network/virtualNetworks/<vnet name>/subnets/<subnet name>"
+        }
+    }
+}

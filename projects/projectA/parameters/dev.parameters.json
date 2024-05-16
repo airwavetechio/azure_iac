@@ -1,0 +1,27 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "appName": {
+            "value": "fundraisingengagement"
+        },
+        "tags": {
+            "value": {
+                "Owner": "tony@airwavetech.io",
+                "Created By": "tony@airwavetech.io",
+                "Tech Team": "Cloud Ops",
+                "Application Name": "ProjectA",
+                "Environment": "prod",
+                "Description": "A place to run the app",
+                "Stakeholder": "tony@airwavetech.io",
+                "Created Using": "BICEP"
+            }
+        },
+        "env": {
+            "value": "dev"
+        },
+        "locationShorthand": {
+            "value": "wus"
+        }
+    }
+}
